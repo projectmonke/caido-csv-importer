@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/base64" // Added for Base64 decoding
 	"encoding/csv"
 	"flag"
 	"fmt"
@@ -22,7 +23,7 @@ type CSVRecord struct {
 	Path                string
 	Length              int64
 	Port                int
-	Raw                 []byte
+	Raw                 []byte // Decoded data
 	IsTLS               bool
 	Query               string
 	FileExtensions      string
@@ -33,7 +34,7 @@ type CSVRecord struct {
 	CreatedAt           int64
 	ResponseID          sql.NullInt64
 	ResponseStatusCode  int
-	ResponseRaw         []byte
+	ResponseRaw         []byte // Decoded data
 	ResponseLength      int64
 	ResponseAlteration  string
 	ResponseEdited      bool
@@ -69,7 +70,7 @@ func (c *Converter) ImportFromCSV(path string) error {
 	defer csvFile.Close()
 
 	reader := csv.NewReader(csvFile)
-
+	// Skip header row
 	if _, err := reader.Read(); err != nil {
 		return fmt.Errorf("error reading header from CSV: %v", err)
 	}
@@ -81,7 +82,7 @@ func (c *Converter) ImportFromCSV(path string) error {
 		}
 		if err != nil {
 			log.Printf("Error reading record from CSV: %v", err)
-			continue
+			continue // Skip to the next record
 		}
 
 		csvRecord, err := parseCSVRecord(record)
@@ -98,6 +99,7 @@ func (c *Converter) ImportFromCSV(path string) error {
 }
 
 // parseCSVRecord converts a string slice from the CSV into a structured CSVRecord.
+// It now decodes the raw request and response data from Base64.
 func parseCSVRecord(record []string) (CSVRecord, error) {
     // Helper function to parse boolean values
 	parseBool := func(s string) bool {
@@ -123,6 +125,18 @@ func parseCSVRecord(record []string) (CSVRecord, error) {
 		return sql.NullInt64{Int64: val, Valid: true}
 	}
 
+	// **Decode raw request and response from Base64**
+	rawRequest, err := base64.StdEncoding.DecodeString(record[6])
+	if err != nil {
+		return CSVRecord{}, fmt.Errorf("failed to decode raw request: %w", err)
+	}
+
+	rawResponse, err := base64.StdEncoding.DecodeString(record[17])
+	if err != nil {
+		return CSVRecord{}, fmt.Errorf("failed to decode raw response: %w", err)
+	}
+
+
 	return CSVRecord{
 		ID:                 parseInt(record[0]),
 		Host:               record[1],
@@ -130,7 +144,7 @@ func parseCSVRecord(record []string) (CSVRecord, error) {
 		Path:               record[3],
 		Length:             parseInt(record[4]),
 		Port:               int(parseInt(record[5])),
-		Raw:                []byte(record[6]),
+		Raw:                rawRequest, // Use decoded data
 		IsTLS:              parseBool(record[7]),
 		Query:              record[8],
 		FileExtensions:     record[9],
@@ -141,7 +155,7 @@ func parseCSVRecord(record []string) (CSVRecord, error) {
 		CreatedAt:          parseInt(record[14]),
 		ResponseID:         parseNullInt(record[15]),
 		ResponseStatusCode: int(parseInt(record[16])),
-		ResponseRaw:        []byte(record[17]),
+		ResponseRaw:        rawResponse, // Use decoded data
 		ResponseLength:     parseInt(record[18]),
 		ResponseAlteration: record[19],
 		ResponseEdited:     parseBool(record[20]),
