@@ -25,7 +25,7 @@ type CSVRecord struct {
 	Raw                 []byte
 	IsTLS               bool
 	Query               string
-	FileExtensions      string // This field is not directly used in the provided schema mapping.
+	FileExtensions      string
 	Source              string
 	Alteration          string
 	Edited              bool
@@ -69,7 +69,7 @@ func (c *Converter) ImportFromCSV(path string) error {
 	defer csvFile.Close()
 
 	reader := csv.NewReader(csvFile)
-	// Skip header row
+
 	if _, err := reader.Read(); err != nil {
 		return fmt.Errorf("error reading header from CSV: %v", err)
 	}
@@ -81,7 +81,7 @@ func (c *Converter) ImportFromCSV(path string) error {
 		}
 		if err != nil {
 			log.Printf("Error reading record from CSV: %v", err)
-			continue // Skip to the next record
+			continue
 		}
 
 		csvRecord, err := parseCSVRecord(record)
